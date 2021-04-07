@@ -18,3 +18,23 @@ class FrenchDeck(object):
     def __getitem__(self, position):
         return self._cards[position]
 
+
+suit_values = dict(spades=3, hearts=2, diamonds=1, clubs=0)
+
+
+def spades_high(card):
+    rank_value = FrenchDeck.ranks.index(card.rank)
+    return rank_value * len(suit_values) + suit_values[card.suit]
+
+
+if __name__ == '__main__':
+    beer_card = Card('7', 'diamonds')
+    print(beer_card)
+    deck = FrenchDeck()
+    print(len(deck))
+
+    print(deck[0])
+    print(deck[-1])
+
+    for card in reversed(deck):
+        print(card)
