@@ -36,5 +36,8 @@ if __name__ == '__main__':
     print(deck[0])
     print(deck[-1])
 
-    for card in reversed(deck):
+    # for card in reversed(deck):
+    # print(card)
+
+    for card in sorted(deck, key=spades_high):
         print(card)
