@@ -4,3 +4,4 @@ flask-restplus
 flask-marshmallow==0.14.0
 marshmallow==3.10.0
 marshmallow-sqlalchemy==0.24.2
+pytest
