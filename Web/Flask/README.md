@@ -38,6 +38,7 @@
   - [4.4. 对于未知字段的行为设定](#44-对于未知字段的行为设定)
   - [4.5. 序列化反序列化改变 字段名](#45-序列化反序列化改变-字段名)
     - [4.5.1. 维护字段有序](#451-维护字段有序)
+- [Middleware](#middleware)
 
 # 1. Reference
 
@@ -738,3 +739,8 @@ pprint(result, indent=2)
 #              ('last_name', 'Stones'),
 #              ('email', 'charlie@stones.com')])
 ```
+
+# Middleware
+[demo](./src/middleware/middleware.py)
+
+作为装饰器，可以装饰app，在请求前和请求后拦截request,response
