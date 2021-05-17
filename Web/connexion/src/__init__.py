@@ -14,25 +14,34 @@ from re import A
 import click
 from loguru import logger
 
-from src.extensions import api, db, ma
+from src.extensions import db, ma
 from src.fakes import fake_user
-from src.settings import config
+from src.config.settings import config
 import os
 import json
 import sys
-from flask import Flask, render_template, request
+from flask import jsonify, render_template, request
 from src.routes import *
+import connexion
+from connexion.resolver import MethodViewResolver
+import uuid
+from src.exception.resterror import NotFound, RestError
 
 
 def create_app(config_name=None):
     if config_name is None:
         config_name = os.getenv("FLASK_CONFIG", "development")
 
-    app = Flask("src")
+    options = {"swagger_ui": True}
+    app = connexion.FlaskApp(__name__, specification_dir='config/', debug=True)
+    app.add_api('pets-api.yaml',
+            options=options,
+            arguments={'title': 'MethodViewResolver Example'},
+            resolver=MethodViewResolver('src.routes'), strict_validation=True, validate_responses=True )
+    app = app.app
     app.config.from_object(config[config_name])
-
     register_extensions(app)
-    # register_errors(app)
+    register_errorhandlers(app)
     register_commands(app)
     register_logging(app)
     return app
@@ -40,22 +49,22 @@ def create_app(config_name=None):
 
 def register_extensions(app):
     db.init_app(app)
-    api.init_app(app, add_specs=app.config["SPECS"])
     ma.init_app(app)
 
 
-# def register_errors(app):
-#     @app.errorhandler(400)
-#     def bad_request(e):
-#         return render_template('errors/400.html'), 400
-#
-#     @app.errorhandler(404)
-#     def page_not_found(e):
-#         return render_template('errors/404.html'), 404
-#
-#     @app.errorhandler(500)
-#     def internal_server_error(e):
-#         return render_template('errors/500.html'), 500
+def register_errorhandlers(app):
+    @app.errorhandler(404)
+    def handle_app_exception(error):
+        notfound = NotFound()
+        response = jsonify(notfound.to_dict())
+        response.status_code = notfound.status_code
+        return response
+
+    @app.errorhandler(RestError)
+    def handle_app_exception(error):
+        response = jsonify(error.to_dict())
+        response.status_code = error.status_code
+        return response
 
 
 def register_commands(app):
@@ -96,13 +105,34 @@ def register_logging(app):
     def customized_serializer(message):
         """Customized the fields we need."""
         record = message.record
+
         fields = {
             "level": record["level"].name,
-            "message": record["message"],
-            "timestamp": record["time"].timestamp(),
+            "message": dict(detail=record["message"]),
+            "timestamp": record["time"].isoformat(),
+            "traceId": record["extra"].get("traceId", str(uuid.uuid4())),
+            "taskId": record["extra"].get("taskId", str(uuid.uuid4())),
+            "type": "trace",
+            "serviceName": "szn",
+            "componentName": "Controller SASEOne Proxy",
         }
+
+        if "traceId" in record["extra"]:
+            del record["extra"]["traceId"]
+
+        if "taskId" in record["extra"]:
+            del record["extra"]["taskId"]
+
+        if record["exception"]:
+            fields["message"]["exception"] = "".join(
+                traceback.format_exception(
+                    type(record["exception"].value),
+                    record["exception"].value,
+                    record["exception"].traceback,
+                )
+            )
         # Gather the bidning fields
-        fields.update(record["extra"])
+        fields["message"].update(record["extra"])
         fileds = json.dumps(fields)
         print(fileds, file=sys.stdout)
 
