@@ -38,9 +38,8 @@ def create_app(config_name=None):
     )
     app = connexion_app.app
     app.config.from_object(config[config_name])
-
     register_extensions(app)
-    # register_errors(app)
+    register_errorhandlers(app)
     register_commands(app)
     register_logging(app)
     return app
@@ -52,18 +51,19 @@ def register_extensions(app):
     ma.init_app(app)
 
 
-# def register_errors(app):
-#     @app.errorhandler(400)
-#     def bad_request(e):
-#         return render_template('errors/400.html'), 400
-#
-#     @app.errorhandler(404)
-#     def page_not_found(e):
-#         return render_template('errors/404.html'), 404
-#
-#     @app.errorhandler(500)
-#     def internal_server_error(e):
-#         return render_template('errors/500.html'), 500
+def register_errorhandlers(app):
+    @app.errorhandler(404)
+    def handle_app_exception(error):
+        notfound = NotFound()
+        response = jsonify(notfound.to_dict())
+        response.status_code = notfound.status_code
+        return response
+
+    @app.errorhandler(RestError)
+    def handle_app_exception(error):
+        response = jsonify(error.to_dict())
+        response.status_code = error.status_code
+        return response
 
 
 def register_commands(app):
@@ -104,13 +104,34 @@ def register_logging(app):
     def customized_serializer(message):
         """Customized the fields we need."""
         record = message.record
+
         fields = {
             "level": record["level"].name,
-            "message": record["message"],
-            "timestamp": record["time"].timestamp(),
+            "message": dict(detail=record["message"]),
+            "timestamp": record["time"].isoformat(),
+            "traceId": record["extra"].get("traceId", str(uuid.uuid4())),
+            "taskId": record["extra"].get("taskId", str(uuid.uuid4())),
+            "type": "trace",
+            "serviceName": "szn",
+            "componentName": "Controller SASEOne Proxy",
         }
+
+        if "traceId" in record["extra"]:
+            del record["extra"]["traceId"]
+
+        if "taskId" in record["extra"]:
+            del record["extra"]["taskId"]
+
+        if record["exception"]:
+            fields["message"]["exception"] = "".join(
+                traceback.format_exception(
+                    type(record["exception"].value),
+                    record["exception"].value,
+                    record["exception"].traceback,
+                )
+            )
         # Gather the bidning fields
-        fields.update(record["extra"])
+        fields["message"].update(record["extra"])
         fileds = json.dumps(fields)
         print(fileds, file=sys.stdout)
 
