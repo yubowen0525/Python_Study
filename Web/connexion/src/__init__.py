@@ -10,25 +10,33 @@
                    2021/3/27:
 -------------------------------------------------
 """
-from re import A
 import click
 from loguru import logger
 
-from src.extensions import api, db, ma
+from src.extensions import db, ma
 from src.fakes import fake_user
-from src.settings import config
+from src.config.settings import config
 import os
 import json
 import sys
-from flask import Flask, render_template, request
 from src.routes import *
+import connexion
+from connexion.resolver import MethodViewResolver
 
 
 def create_app(config_name=None):
     if config_name is None:
         config_name = os.getenv("FLASK_CONFIG", "development")
 
-    app = Flask("src")
+    connexion_app = connexion.FlaskApp(__name__, specification_dir="./swagger/", debug=True)
+    connexion_app.add_api(
+        "swagger.yaml",
+        arguments={"title": "Hello World Example"},
+        resolver=MethodViewResolver("src.routes"),
+        strict_validation=True,
+        validate_responses=True,
+    )
+    app = connexion_app.app
     app.config.from_object(config[config_name])
 
     register_extensions(app)
@@ -40,7 +48,7 @@ def create_app(config_name=None):
 
 def register_extensions(app):
     db.init_app(app)
-    api.init_app(app, add_specs=app.config["SPECS"])
+    # api.init_app(app, add_specs=app.config["SPECS"])
     ma.init_app(app)
 
 
@@ -74,9 +82,9 @@ def register_commands(app):
         click.echo("Initialized database.")
 
     @app.cli.command()
-    @click.option('--user', default=10, help='Quantity of users, default is 10.')
+    @click.option("--user", default=10, help="Quantity of users, default is 10.")
     def forge(user):
-        click.echo('Generating %d users...' % user)
+        click.echo("Generating %d users..." % user)
         fake_user(user)
 
 
